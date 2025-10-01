@@ -6,7 +6,7 @@ This is stupid. And simple.  And it generates static sites.  Written in Bash. Yi
 
 * clone the repo. 
 * `chmod +x s4g.sh`
-* `s4g.sh init`
+* `./s4g.sh init`
 * (optional) `python3 -m http.server 8000`
 
 Bask in the glory of your new site.
@@ -36,8 +36,8 @@ Bask in the glory of your new site.
     footer.html
   ```
 
-* `scaffold` - Scaffolds a post. Takes *title* as an argument. so, `s4g.sh scaffold "My Summer Vacation"` creates a new folder in `posts` called `my-summer-vacation` with an index.md in there. Edit that and tell us all what you did last summer, little Johnny.
-* `build` - Builds the site.  Basically, it goes through each post in `/posts`, converts the .md to .html by wrapping the contents of the markdown in the header and footer templates.  It also keeps track of the tags and generates tag pages. It also generates the RSS feeds.
+* `scaffold` - Scaffolds a post. Takes *title* as an argument. so, `./s4g.sh scaffold "My Summer Vacation"` creates a new folder in `posts` called `my-summer-vacation` with an index.md in there. Edit that and tell us all what you did last summer, little Johnny.
+* `build` - Builds the site.  Basically, it goes through each post in `/posts`, converts the .md to .html by wrapping the contents of the markdown in the header and footer templates.  It also keeps track of the tags and generates tag pages. It also generates the RSS feeds and the sitemap.xml. You'll want to run `./s4g.sh build` whenever you update a .md file or style.css.
 
 There's nav in header.html. You need to manually edit it.  I'm not going to decide for you what goes in your nav. __MAKE IT YOURS__!
 
