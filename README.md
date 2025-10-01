@@ -1,6 +1,6 @@
 # Stupidly Simple Static Site Generator (S4G)
 
-This is stupid. And simple.  And it generates static sites.  Written in Bash. Yikes. I'm only sharing it here so the world knows how bad of an idea this is.
+This is stupid. And simple.  And it generates static sites.  In Bash. Yikes. I'm only sharing it here so the world knows how bad of an idea this is.
 
 ## Setup
 
@@ -73,13 +73,13 @@ some of these fields (title, date, tags) are obvious. others warrant some explai
 * __description__ will accept markdown.  This is what gets output on the main /index.html and on the tag pages (like /tags/summer/index.html).
 * __section__ whatever you add here just gets added as a class to the body tag of that page...so `<body class="photos">`
 * __hide_from_feed__ set this to __1__ if you don't want this to display on the main /index.html...useful for about pages or the like.
-* __photo_page__ set this to __1__ if you want the page to include a grid of photos (placed as a sub-folder of your post folder.  So `/posts/my-summer-vacation/photos/`  The script will shrink them down and create a `thumbs` sub-folder in there.  The filenames are used as captions.  not ideal, but, yeah.)  You could always make the grid yourself if you want to get fancy.
+* __photo_page__ set this to __1__ if you want the page to include a grid of photos (placed as a sub-folder of your post folder.  So `/posts/my-summer-vacation/photos/`  The script will shrink them down and create a `thumbs` sub-folder in there.  The filenames are used as captions.  not ideal, but, yeah.)  You could always make the grid yourself in your .md file if you want to get fancy.
 
 
 
 ## Why
 
-I'm stupid and simple. Honestly, I just like HTML and I don't want package managers, build pipelines, upgrade paths, security patches, node versions, yarn whatever...all the shit that is associated with basically _any_ kind of web development in this day and age.  I just want a way to write a post and build a site...I also want it to be accessible.  I also don't want any javascript.  You can add whatever you want.  All this stupid thing does is generate HTML files.  In a really inefficient and stupid way.  With Bash. It works on my machine. It may or may not work on yours. Patches welcome.
+I'm stupid and simple. Honestly, I just like HTML and I don't want package managers, databases, build pipelines, upgrade paths, security patches, node versions, yarn whatever...all the shit that is associated with basically _any_ kind of web development in this day and age.  I just want a way to write a post and build a site...I also want it to be accessible.  I also don't want any javascript.  You can add whatever you want.  All this stupid thing does is generate HTML files.  In a really inefficient and stupid way.  With Bash. It works on my machine. It may or may not work on yours. Patches welcome.
 
 
 
