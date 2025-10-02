@@ -655,17 +655,20 @@ EOF
 
     # Templates (preserve original header/footer content)
     cat > "$TEMPLATES_DIR/header.html" <<EOF
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{title}}</title>
+  <meta name="description" content="">
   <!-- INLINE_CRITICAL_CSS -->
   <link rel="stylesheet" href="/css/style.min.css">
   <link rel="alternate" href="/feed/feed.xml" type="application/atom+xml" title="$SITE_TITLE rss feed">
   <link rel="alternate" href="/feed/feed.json" type="application/json" title="$SITE_TITLE json feed">
 </head>
 <body class="{{body_class}}">
+<a href="#skip" class="visually-hidden">Skip to main content</a>
 <header>
   <h1><a href="/" class="home-link" title="$SITE_TITLE">$SITE_TITLE</a></h1>
         <nav>
@@ -675,7 +678,7 @@ EOF
                     <a href="/" aria-current="page">Home</a>
                 </li>
                 <li class="nav-item">
-                    <a href="/feeds/feed.xml">RSS</a>
+                    <a href="/$FEED_DIR/feed.xml">RSS</a>
                 </li>                              
             </ul>
         </nav>  
@@ -689,7 +692,7 @@ EOF
 
     cat > "$TEMPLATES_DIR/footer.html" <<EOF
     <!-- POST_END -->
-  </section>    
+  <!--POSTNAV--></section>    
 </main>
 </div>
 <footer>
