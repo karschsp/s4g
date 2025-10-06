@@ -475,7 +475,7 @@ build_site() {
     {
         CRITICAL_CSS=$(tr -d '\n' < "$CRITICAL_CSS_FILE" | tr -s ' ')
         awk -v css="$CRITICAL_CSS" -v title="Tags - $SITE_TITLE" -v body_class="tags-index" \
-            '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
+            '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{META_DESC\}\}/, title); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
             "$TEMPLATES_DIR/header.html"
 
         echo "<h2>Tags</h2><ul class='postlist tagslist'>"
