@@ -4,33 +4,38 @@ set -e
 CONFIG_FILE="config.yml"
 
 # -----------------------------
-# UTILS / PARSERS 
+# UTILS / PARSERS
 # -----------------------------
-render_markdown() {
-    local md="$1"
-    if [[ -z "$md" ]]; then
-        echo ""
-        return
-    fi
+#render_markdown() {
+
+#    local md="$1"
+#    if [[ -z "$md" ]]; then
+#        echo ""
+#        return
+#    fi
     # Use a here-string to pass to pandoc
-    echo "$md" | pandoc --from=markdown_phpextra -t html | tr -d '\n'
+#    echo "$md" | pandoc --from=markdown_phpextra -t html | tr -d '\n'
+#}
+render_markdown() {
+    #echo "$1" | markdown
+    printf "%s\n" "$1" | pandoc -f markdown -t html | tr -d '\n'
 }
 
 
 extract_description() {
-    local md_file="$1"
-    awk '
-        BEGIN { in_fm=0; in_desc=0 }
-        /^---$/ { in_fm = 1 - in_fm; next }
-        in_fm && /^description:/ {
-            in_desc=1
-            sub(/^description:[[:space:]]*/, "")
-            if (length($0)) print $0
-            next
-        }
-        in_desc && /^[a-zA-Z0-9_]+:/ { exit }  # next key → stop
-        in_desc { print }
-    ' "$md_file"
+   local md_file="$1"
+   awk '
+       BEGIN { in_fm=0; in_desc=0 }
+       /^---$/ { in_fm = 1 - in_fm; next }
+       in_fm && /^description:/ {
+           in_desc=1
+           sub(/^description:[[:space:]]*/, "")
+           if (length($0)) print $0
+           next
+       }
+       in_desc && /^[a-zA-Z0-9_]+:/ { exit }  # next key → stop
+       in_desc { print }
+   ' "$md_file"
 }
 
 
@@ -56,6 +61,7 @@ read_config() {
     TAGS_DIR=${TAGS_DIR:-tags}
     CRITICAL_CSS_FILE=${CRITICAL_CSS_FILE:-css/critical.css}
     SITE_TITLE=${SITE_TITLE:-Site Title}
+    SITE_DESCRIPTION=${SITE_DESCRIPTION:-Site Description}
     BASE_URL=${BASE_URL:-http://localhost:8000}
     return 0
 }
@@ -118,25 +124,26 @@ strip_frontmatter() {
 
 # -----------------------------
 # Parse frontmatter (ignore multiline description)
-# returns: title|date|tags|hide_from_feed|photo_page|section
+# returns: title|date|tags|hide_from_feed|photo_page|section|draft
 # -----------------------------
-# returns: title|date|tags|hide_from_feed|photo_page|section
 parse_frontmatter() {
     local file="$1"
     awk '
         function trim(s) {
-            sub(/^[ \t\r\n]+/, "", s);
-            sub(/[ \t\r\n]+$/, "", s);
-            return s;
+            sub(/^[ \t\r\n]+/, "", s)
+            sub(/[ \t\r\n]+$/, "", s)
+            return s
         }
+        BEGIN {title=""; date=""; tags=""; hff=""; pp=""; sec=""; draft=""}
         /^---$/ {i++; next}
-        i==1 && /^title: /        {title=trim(substr($0,8))}
-        i==1 && /^date: /         {date=trim(substr($0,7))}
-        i==1 && /^tags: /         {tags=trim(substr($0,6))}
-        i==1 && /^hide_from_feed:/ {hff=trim(substr($0,16))}
-        i==1 && /^photo_page:/    {pp=trim(substr($0,13))}
-        i==1 && /^section:/       {sec=trim(substr($0,9))}
-        END {print title "|" date "|" tags "|" hff "|" pp "|" sec}
+        i==1 && /^[[:space:]]*title:/        {title=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*date:/         {date=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*tags:/         {tags=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*hide_from_feed:/ {hff=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*photo_page:/   {pp=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*section:/      {sec=trim(substr($0,index($0,":")+1))}
+        i==1 && /^[[:space:]]*draft:/        {draft=trim(substr($0,index($0,":")+1))}
+        END {print title "|" date "|" tags "|" hff "|" pp "|" sec "|" draft}
     ' "$file"
 }
 
@@ -188,6 +195,7 @@ tags:
 section:
 hide_from_feed: 0
 photo_page: 0
+draft: 0
 ---
 EOF
 
@@ -263,15 +271,19 @@ build_site() {
         [[ -f "$MD_FILE" ]] || continue
 
         # Parse frontmatter (ignore description in Bash array)
-        IFS='|' read -r title date tags hide_from_feed photo_page section <<< "$(parse_frontmatter "$MD_FILE")"
-
+        IFS='|' read -r title date tags hide_from_feed photo_page section draft <<< "$(parse_frontmatter "$MD_FILE")"
+        # Skip drafts entirely
+        if [[ "$draft" == "1" ]]; then
+            echo "Skipping draft $post"
+            continue
+        fi
         # Extract and render description
         desc_md=$(extract_description "$MD_FILE")
         desc_html=$(render_markdown "$desc_md")
 
         # Strip frontmatter to get full post content
         CONTENT_MD=$(strip_frontmatter "$MD_FILE")
-        CONTENT_HTML=$(echo "$CONTENT_MD" | pandoc --from=markdown_phpextra -t html)
+        CONTENT_HTML=$(echo "$CONTENT_MD" | pandoc --from=markdown_phpextra -t html5)
 
         # PHOTO PAGE SUPPORT (unchanged)
         PHOTO_HTML=""
@@ -317,11 +329,13 @@ build_site() {
         # Write post HTML
         slug=$(basename "$post")
         body_class="$slug"
+        # Strip HTML from desc_html for meta tag (avoid markup)
+        meta_desc=$(echo "$desc_html" | sed -E 's/<[^>]+>//g' | tr -d '\n' | cut -c1-160)
         [[ -n "$section" ]] && body_class+=" $section"
         CRITICAL_CSS=$(tr -d '\n' < "$CRITICAL_CSS_FILE" | tr -s ' ')
         {
-            awk -v css="$CRITICAL_CSS" -v title="$title - $SITE_TITLE" -v body_class="$body_class" \
-                '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
+            awk -v css="$CRITICAL_CSS" -v title="$title - $SITE_TITLE" -v body_class="$body_class" -v meta_desc="$meta_desc" \
+                '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{META_DESC\}\}/, meta_desc); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
                 "$TEMPLATES_DIR/header.html"
             echo "$POST_BODY"
             awk -v title="$SITE_TITLE" '{ gsub(/\{\{site_title\}\}/, title); print }' "$TEMPLATES_DIR/footer.html"
@@ -340,10 +354,7 @@ build_site() {
             TAG_DISPLAY["$tag_slug"]="$clean_tag"
             TAG_MAP["$tag_slug"]+="$date|$title|$(basename "$post")|$desc_html"$'\n'
         done
-        #echo $desc_html
-        
         #[[ "$hide_from_feed" == " 0" ]] || POST_ENTRIES+=("$date|$title|$tags|$(basename "$post")|$desc_html|$section")
-
         #[[ "$hide_from_feed" == " 1" ]] || POST_ENTRIES+=("$date"$'\t'"$title"$'\t'"$tags"$'\t'"$(basename "$post")"$'\t'"$description"$'\t'"$section")
         [[ "$hide_from_feed" == "1" ]] && continue
         POST_ENTRIES+=("$date|$title|$tags|$(basename "$post")|$desc_html|$section")
@@ -360,22 +371,45 @@ build_site() {
     # -----------------------------
     {
         CRITICAL_CSS=$(tr -d '\n' < "$CRITICAL_CSS_FILE" | tr -s ' ')
-        awk -v css="$CRITICAL_CSS" -v title="$SITE_TITLE" -v body_class="index" \
-            '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
+        awk -v css="$CRITICAL_CSS" -v title="$SITE_TITLE" -v body_class="index" -v site_description="$SITE_DESCRIPTION" \
+            '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{META_DESC\}\}/, site_description); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
             "$TEMPLATES_DIR/header.html"
 
         echo '<h2 class="post-title">Home</h2>'
         echo "<ul class='postlist'>"
 
         for entry in "${POST_ENTRIES[@]}"; do
-            
             IFS='|' read -r date title tags post_path desc_html section <<< "$entry"
             #IFS='|' read -r date title tags post_path section <<< "$entry"
             MD_FILE="$POSTS_DIR/$post_path/index.md"
             description=$(extract_description "$MD_FILE")
-            desc_html=$(render_markdown "$description")           
+            #***********************************
+            if [[ "$description" == *"<!--HTML-->"* ]]; then
+                # Split into two parts
+                md_part=$(printf "%s\n" "$description" | sed '1,/<!--HTML-->/d')   # after marker
+                html_part=$(printf "%s\n" "$description" | sed -n '/<!--HTML-->/,$p' | sed '1d')
+
+                # Markdown conversion for part *before* marker
+                before_marker=$(printf "%s\n" "$description" | sed '/<!--HTML-->/,$d')
+                if [[ -n "$before_marker" ]]; then
+                    md_html=$(printf "%s\n" "$before_marker" | pandoc -f markdown -t html | tr -d '\n')
+                else
+                    md_html=""
+                fi
+
+                # Combine: converted markdown + raw HTML
+                desc_html="$md_html$html_part"
+            else
+                # No marker → everything is markdown
+                desc_html=$(printf "%s\n" "$description" | pandoc -f markdown -t html | tr -d '\n')
+            fi
+            #***********************************
+            #echo "RAW DESC >>>${description}<<<"
+            #//desc_html=$(render_markdown "$description")
+            #desc_html=$(printf "%s\n" "$description" | render_markdown)
+            #echo "HTML DESC >>>${desc_html}<<<"
             IFS=',' read -ra tag_array <<< "$tags"
-            
+
             echo "<li class='post-item'>
                 <div class='post-date'><time>$date</time></div>
                 <div class='post-content'>
@@ -409,8 +443,8 @@ build_site() {
 
         {
             CRITICAL_CSS=$(tr -d '\n' < "$CRITICAL_CSS_FILE" | tr -s ' ')
-            awk -v css="$CRITICAL_CSS" -v title="Tag: $display_tag - $SITE_TITLE" -v body_class="tag-${tag_slug}" \
-                '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
+            awk -v css="$CRITICAL_CSS" -v title="Tag: $display_tag - $SITE_TITLE" -v body_class="tag-${tag_slug}" -v meta_desc="Posts tagged with $display_tag" \
+                '{ gsub(/\{\{title\}\}/, title); gsub(/\{\{META_DESC\}\}/, meta_desc); gsub(/\{\{body_class\}\}/, body_class); gsub(/<!-- INLINE_CRITICAL_CSS -->/, "<style>" css "</style>"); print }' \
                 "$TEMPLATES_DIR/header.html"
 
             echo "<h2 class='post-title'>Tag: $display_tag</h2><ul class='postlist'>"
@@ -473,6 +507,10 @@ build_site() {
         # Extract content between markers
         content=$(awk '/<!-- POST_START -->/{flag=1; next} /<!-- POST_END -->/{flag=0} flag{print}' "$POSTS_DIR/$post_path/index.html" 2>/dev/null || true)
 
+        # Remove the header-row line (works even with leading spaces)
+        content=$(echo "$content" | sed -E "s/^[[:space:]]*<div class='header-row'>.*<\/div>[[:space:]]*//")
+
+        # Escape CDATA
         safe_content="${content//]]>/]]]]><![CDATA[>}"
 
         # deterministic hash-based time
@@ -621,6 +659,9 @@ init_project() {
     read -p "Site title [Site Title]: " SITE_TITLE
     SITE_TITLE=${SITE_TITLE:-Site Title}
 
+    read -p "Site descriptiong [Site Description]: " SITE_DESCRIPTION
+    SITE_DESCRIPTION=${SITE_DESCRIPTION:-Site Description}
+
     # Write config.yml
     cat > "$CONFIG_FILE" <<EOF
 POSTS_DIR: $POSTS_DIR
@@ -630,6 +671,7 @@ TAGS_DIR: $TAGS_DIR
 CRITICAL_CSS_FILE: $CRITICAL_CSS_FILE
 INDEX_FILE: $INDEX_FILE
 SITE_TITLE: $SITE_TITLE
+SITE_DESCRIPTION: $SITE_DESCRIPTION
 BASE_URL: http://localhost:8000
 EOF
 
@@ -661,7 +703,7 @@ EOF
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{title}}</title>
-  <meta name="description" content="">
+  <meta name="description" content="{{META_DESC}}">
   <!-- INLINE_CRITICAL_CSS -->
   <link rel="stylesheet" href="/css/style.min.css">
   <link rel="alternate" href="/feed/feed.xml" type="application/atom+xml" title="$SITE_TITLE rss feed">
@@ -679,9 +721,9 @@ EOF
                 </li>
                 <li class="nav-item">
                     <a href="/$FEED_DIR/feed.xml">RSS</a>
-                </li>                              
+                </li>
             </ul>
-        </nav>  
+        </nav>
 </header>
     <div class="page">
     <main id="skip">
@@ -692,7 +734,7 @@ EOF
 
     cat > "$TEMPLATES_DIR/footer.html" <<EOF
     <!-- POST_END -->
-  <!--POSTNAV--></section>    
+  <!--POSTNAV--></section>
 </main>
 </div>
 <footer>
@@ -715,6 +757,7 @@ tags: intro, example
 section: blog
 hide_from_feed: 0
 photo_page: 0
+draft: 0
 ---
 
 Welcome to your new site! 🎉
@@ -754,4 +797,3 @@ case "$1" in
         exit 1
         ;;
 esac
-
